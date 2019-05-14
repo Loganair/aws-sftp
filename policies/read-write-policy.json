@@ -5,7 +5,7 @@
       "Sid": "AllowListingOfUserFolder",
       "Action": ["s3:ListBucket", "s3:GetBucketLocation"],
       "Effect": "Allow",
-      "Resource": ["arn:aws:s3:::bucket_name"]
+      "Resource": ["arn:aws:s3:::${bucket}"]
     },
     {
       "Sid": "HomeDirObjectAccess",
@@ -17,7 +17,7 @@
         "s3:DeleteObject",
         "s3:GetObjectVersion"
       ],
-      "Resource": "arn:aws:s3:::${bucket_name}/*"
+      "Resource": "arn:aws:s3:::${bucket}/*"
     }
   ]
 }
