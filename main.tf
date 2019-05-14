@@ -24,7 +24,7 @@ terraform {
     }
 }
 
-# Import the required IAM policies
+# Import the JSON policy files
 data "template_file" "iam_role_policy" {
     template = "${file("policies/role-policy.json")}"
 }
@@ -37,7 +37,24 @@ data "template_file" "read_write_policy" {
     }
 }
 
-# Create the required roles and policies
+data "template_file" "logging_policy" {
+    template = "${file("policies/logging-policy.json")}"
+}
+
+# Role and policy for CloudWatch logging
+resource "aws_iam_role" "cloudwatch_logging" {
+    name               = "AWSSFTPLogging"
+    description        = "Provides the ability to create logs in Amazon Cloudwatch"
+    assume_role_policy = "${data.template_file.iam_role_policy.rendered}"
+}
+
+resource "aws_iam_role_policy" "cloudwatch_logging_policy" {
+    name   = "AWSSFTPLoggingPolicy"
+    role   = "${aws_iam_role.cloudwatch_logging.id}"
+    policy = "${data.template_file.logging_policy.rendered}"
+}
+
+# Role and policy for read/write access to the Accelya bucket
 resource "aws_iam_role" "accelya_read_write" {
     name               = "AWSSFTPAccelyaReadWrite"
     description        = "Provides read/write access to the Accelya S3 bucket via SFTP"
@@ -45,7 +62,7 @@ resource "aws_iam_role" "accelya_read_write" {
 }
 
 resource "aws_iam_role_policy" "accelya_read_write_policy" {
-    name   = "AWSSFTPAccelyaReadWrite-Policy"
+    name   = "AWSSFTPAccelyaReadWritePolicy"
     role   = "${aws_iam_role.accelya_read_write.id}"
     policy = "${data.template_file.read_write_policy.rendered}"
 }
@@ -70,12 +87,26 @@ resource "aws_s3_bucket" "accelya" {
     versioning = {
         enabled = true
     }
+
+    server_side_encryption_configuration {
+        rule {
+            apply_server_side_encryption_by_default {
+                sse_algorithm = "AES256"
+            }
+        }
+    }
+
+    tags = {
+        Name        = "AWS SFTP Server"
+        Environment = "Production"
+    }
 }
 
 resource "aws_transfer_server" "loganair-sftp" {
     endpoint_type          = "PUBLIC"
     identity_provider_type = "SERVICE_MANAGED"
-    #logging_role           = ""
+    logging_role           = "${aws_iam_role.cloudwatch_logging.arn}"
+    force_destroy          = true
 
     tags = {
         Name        = "AWS SFTP Server"
