@@ -29,16 +29,16 @@ data "template_file" "iam_role_policy" {
     template = "${file("policies/role-policy.json")}"
 }
 
+data "template_file" "logging_policy" {
+    template = "${file("policies/logging-policy.json")}"
+}
+
 data "template_file" "read_write_policy" {
     template = "${file("policies/read-write-policy.json")}"
 
     vars {
         bucket = "${aws_s3_bucket.accelya.id}"
     }
-}
-
-data "template_file" "logging_policy" {
-    template = "${file("policies/logging-policy.json")}"
 }
 
 # Role and policy for CloudWatch logging
@@ -68,9 +68,10 @@ resource "aws_iam_role_policy" "accelya_read_write_policy" {
 }
 
 resource "aws_transfer_user" "logadmin" {
-    server_id = "${aws_transfer_server.loganair-sftp.id}"
-    user_name = "logadmin"
-    role      = "${aws_iam_role.accelya_read_write.arn}"
+    server_id      = "${aws_transfer_server.loganair-sftp.id}"
+    user_name      = "logadmin"
+    home_directory = "${format("/s%", aws_s3_bucket.accelya.id)}"
+    role           = "${aws_iam_role.accelya_read_write.arn}"
 }
 
 resource "aws_transfer_ssh_key" "logadmin_key" {
@@ -102,6 +103,7 @@ resource "aws_s3_bucket" "accelya" {
     }
 }
 
+# Create the AWS SFTP server
 resource "aws_transfer_server" "loganair-sftp" {
     endpoint_type          = "PUBLIC"
     identity_provider_type = "SERVICE_MANAGED"
