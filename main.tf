@@ -24,6 +24,11 @@ terraform {
     }
 }
 
+# Local string manipulation
+data "template_file" "home_dir" {
+    template = "${format("/%s", aws_s3_bucket.accelya.id)}"
+}
+
 # Import the JSON policy files
 data "template_file" "iam_role_policy" {
     template = "${file("policies/role-policy.json")}"
@@ -70,7 +75,7 @@ resource "aws_iam_role_policy" "accelya_read_write_policy" {
 resource "aws_transfer_user" "logadmin" {
     server_id      = "${aws_transfer_server.loganair-sftp.id}"
     user_name      = "logadmin"
-    home_directory = "${format("/s%", aws_s3_bucket.accelya.id)}"
+    home_directory = "${data.template_file.home_dir.rendered}"
     role           = "${aws_iam_role.accelya_read_write.arn}"
 }
 
