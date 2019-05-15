@@ -30,8 +30,8 @@ data "template_file" "home_dir" {
 }
 
 # Import the JSON policy files
-data "template_file" "iam_role_policy" {
-    template = "${file("policies/role-policy.json")}"
+data "template_file" "assume_role_policy" {
+    template = "${file("policies/assume-role-policy.json")}"
 }
 
 data "template_file" "logging_policy" {
@@ -50,7 +50,7 @@ data "template_file" "read_write_policy" {
 resource "aws_iam_role" "cloudwatch_logging" {
     name               = "AWSSFTPLogging"
     description        = "Provides the ability to create logs in Amazon Cloudwatch"
-    assume_role_policy = "${data.template_file.iam_role_policy.rendered}"
+    assume_role_policy = "${data.template_file.assume_role_policy.rendered}"
 }
 
 resource "aws_iam_role_policy" "cloudwatch_logging_policy" {
@@ -63,7 +63,7 @@ resource "aws_iam_role_policy" "cloudwatch_logging_policy" {
 resource "aws_iam_role" "accelya_read_write" {
     name               = "AWSSFTPAccelyaReadWrite"
     description        = "Provides read/write access to the Accelya S3 bucket via SFTP"
-    assume_role_policy = "${data.template_file.iam_role_policy.rendered}"
+    assume_role_policy = "${data.template_file.assume_role_policy.rendered}"
 }
 
 resource "aws_iam_role_policy" "accelya_read_write_policy" {
