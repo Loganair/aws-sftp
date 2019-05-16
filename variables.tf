@@ -25,3 +25,21 @@ variable "sftp_accounts" {
         }
     ]
 }
+
+variable "cloudflare_zone" {
+    description = "The CloudFlare domain name"
+    type        = "string"
+    default     = "loganair.co.uk"
+}
+
+variable "cloudflare_email" {
+    description = "The CloudFlare account name"
+    type        = "string"
+    default     = ""
+}
+
+variable "cloudflare_token" {
+    description = "The CloudFlare API key"
+    type        = "string"
+    default     = ""
+}

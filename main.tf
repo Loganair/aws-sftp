@@ -3,10 +3,11 @@ provider "aws" {
     region  = "${var.aws_region}"
 }
 
-#provider "cloudflare" {
-#    email = ""
-#    token = ""
-#}
+provider "cloudflare" {
+    email   = "${var.cloudflare_email}"
+    token   = "${var.cloudflare_token}"
+    version = "~> 1.14"
+}
 
 provider "template" {
     version = "~> 1.0"
@@ -166,12 +167,14 @@ resource "aws_transfer_server" "loganair-sftp" {
     }
 }
 
-## Add a record to the domain
-#resource "cloudflare_record" "sftp" {
-#  domain  = "${var.cloudflare_zone}"
-#  name    = "sftp"
-#  value   = "${aws_transfer_server.name.endpoint}"
-#  type    = "CNAME"
-#  proxied = false
-#  ttl     = 3600
-#}
+################################
+# Add DNS record to the domain #
+################################
+resource "cloudflare_record" "sftp" {
+  domain  = "${var.cloudflare_zone}"
+  name    = "sftp"
+  value   = "${aws_transfer_server.loganair-sftp.endpoint}"
+  type    = "CNAME"
+  proxied = false
+  ttl     = 3600
+}
