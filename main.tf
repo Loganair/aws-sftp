@@ -24,28 +24,6 @@ terraform {
     }
 }
 
-locals {
-    s3_arn        = "arn:aws:s3:::"
-    s3_arn_ending = "/*"
-}
-
-# Format home directory string correctly - it must begin with a "/"
-data "template_file" "home_dirs" {
-    count    = "${length(var.buckets)}"
-    template = "${format("/%s", var.buckets[count.index])}"
-}
-
-# String manipulation to dynamically create the resource portion of the admin policy
-data "template_file" "admin_arn_1" {
-    count    = "${length(var.buckets)}"
-    template = "${format("\"%s%s\"", local.s3_arn, var.buckets[count.index])}"
-}
-
-data "template_file" "admin_arn_2" {
-    count    = "${length(var.buckets)}"
-    template = "${format("\"%s%s%s\"", local.s3_arn, var.buckets[count.index], local.s3_arn_ending)}"
-}
-
 # Import the JSON policy files
 data "template_file" "assume_role_policy" {
     template = "${file("policies/assume-role-policy.json.tpl")}"
@@ -55,13 +33,16 @@ data "template_file" "cloudwatch_logging_policy" {
     template = "${file("policies/cloudwatch-logging-policy.json.tpl")}"
 }
 
-data "template_file" "admin_policy" {
-    template = "${file("policies/admin-policy.json.tpl")}"
+data "template_file" "standard_access_policy" {
+    template = "${file("policies/standard-access-policy.json.tpl")}"
 
     vars {
-        arn1 = "${join(", ", data.template_file.admin_arn_1.*.rendered)}"
-        arn2 = "${join(", ", data.template_file.admin_arn_2.*.rendered)}"
+        bucket = "${var.bucket_name}"
     }
+}
+
+data "template_file" "restricted_access_policy" {
+    template = "${file("policies/restricted-access-policy.json.tpl")}"
 }
 
 ##########################################
@@ -79,57 +60,77 @@ resource "aws_iam_role_policy" "cloudwatch_logging_policy" {
     policy = "${data.template_file.cloudwatch_logging_policy.rendered}"
 }
 
-####################################
-# Role and policy for admin access #
-####################################
+##########################################
+# Role, policy and user for admin access #
+##########################################
 resource "aws_iam_role" "sftp_admin" {
     name               = "AWSSFTPAdmin"
-    description        = "Provides read/write access to all S3 buckets accessible via SFTP"
+    description        = "Provides read/write access to the entire S3 SFTP bucket"
     assume_role_policy = "${data.template_file.assume_role_policy.rendered}"
 }
 
-resource "aws_iam_role_policy" "sftp_admin_policy" {
-    name   = "AWSSFTPAdminPolicy"
-    role   = "${aws_iam_role.sftp_admin.id}"
-    policy = "${data.template_file.admin_policy.rendered}"
+resource "aws_iam_policy" "sftp_standard_access_policy" {
+    name        = "AWSSFTPStandardAccessPolicy"
+    description = "Policy for standard read/write access to the entire S3 SFTP bucket"
+    policy      = "${data.template_file.standard_access_policy.rendered}"
 }
 
-############################################
-# Role and policy for standard user access #
-############################################
-resource "aws_iam_role" "sftp_read_write" {
-    name               = "AWSSFTPReadWrite"
-    description        = "Provides read/write access to the Accelya S3 bucket via SFTP"
-    assume_role_policy = "${data.template_file.assume_role_policy.rendered}"
+resource "aws_iam_role_policy_attachment" "sftp_admin_policy" {
+    role       = "${aws_iam_role.sftp_admin.id}"
+    policy_arn = "${aws_iam_policy.sftp_standard_access_policy.arn}"
 }
-
-resource "aws_iam_role_policy" "accelya_read_write_policy" {
-    name   = "AWSSFTPAccelyaReadWritePolicy"
-    role   = "${aws_iam_role.accelya_read_write.id}"
-    policy = "${data.template_file.admin_read_write_policy.rendered}"
-}
-
-
-
-
 
 resource "aws_transfer_user" "logadmin" {
     server_id      = "${aws_transfer_server.loganair-sftp.id}"
     user_name      = "logadmin"
-    home_directory = "/accelya-sftp"
+    home_directory = "/${var.bucket_name}"
     role           = "${aws_iam_role.sftp_admin.arn}"
 }
 
 resource "aws_transfer_ssh_key" "logadmin_key" {
     server_id = "${aws_transfer_server.loganair-sftp.id}"
     user_name = "${aws_transfer_user.logadmin.user_name}"
-    body      = "ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEAmbkJTsNeaCTULT+/3jYpNKmBjqmxTmMDhjxiNpCfOvPwfAWGfoTbYYAcB9hM6EXUEhLcOCUkiXGpMsiTOKlG1Jeyx0BGWmudxOn24zW7M8fERQSNYbGbCwBezpUhEfJii82CvV34rxGLvz2KpfTZzwqfUR0J2gAoCQPtgzueBkimD6Ol86Y42wL7wYfZfMf4Sgdx1RaqWBAJ6f5IgPOv6s8Vp4jIGr3Wn5De4m2SQv7UMP00p3fBsYB3G5POhrbTZU6L/AYQn6U657AlmWekcJNmx+nyORy7K87hFTtw8CBytDtfitbU3xfQAtKYfHNXqU0k6fUqYhfhPKOJlluf2w== rsa-key-20190514"
+    body      = "${var.admin_pubkey}"
 }
 
-# Create the required S3 buckets
-resource "aws_s3_bucket" "this" {
-    count  = "${length(var.buckets)}"
-    bucket = "${var.buckets[count.index]}"
+############################################
+# Role and policy for standard user access #
+############################################
+resource "aws_iam_role" "this" {
+    count              = "${length(var.sftp_accounts)}"
+    name               = "AWSSFTP${title(lookup(var.sftp_accounts[count.index], "name"))}"
+    description        = "Provides read/write access to the ${lookup(var.sftp_accounts[count.index], "name")} folder in the S3 bucket"
+    assume_role_policy = "${data.template_file.assume_role_policy.rendered}"
+}
+
+resource "aws_iam_role_policy_attachment" "sftp_standard_access_policy" {
+    count      = "${length(var.sftp_accounts)}"
+    role       = "${element(aws_iam_role.this.*.id, count.index)}"
+    policy_arn = "${aws_iam_policy.sftp_standard_access_policy.arn}"
+}
+
+resource "aws_transfer_user" "this" {
+    count          = "${length(var.sftp_accounts)}"
+    server_id      = "${aws_transfer_server.loganair-sftp.id}"
+    user_name      = "${lookup(var.sftp_accounts[count.index], "name")}"
+    home_directory = "/${var.bucket_name}/${lookup(var.sftp_accounts[count.index], "name")}"
+    role           = "${element(aws_iam_role.this.*.arn, count.index)}"
+    policy         = "${data.template_file.restricted_access_policy.rendered}"
+}
+
+resource "aws_transfer_ssh_key" "this" {
+    count      = "${length(var.sftp_accounts)}"
+    server_id  = "${aws_transfer_server.loganair-sftp.id}"
+    user_name  = "${lookup(var.sftp_accounts[count.index], "name")}"
+    body       = "${lookup(var.sftp_accounts[count.index], "key")}"
+    depends_on = ["aws_transfer_user.this"]
+}
+
+################################################
+# Create the required S3 bucket for SFTP files #
+################################################
+resource "aws_s3_bucket" "loganair-sftp" {
+    bucket = "${var.bucket_name}"
     acl    = "private"
 
     versioning = {
@@ -150,7 +151,9 @@ resource "aws_s3_bucket" "this" {
     }
 }
 
-# Create the AWS SFTP server
+##############################
+# Create the AWS SFTP server #
+##############################
 resource "aws_transfer_server" "loganair-sftp" {
     endpoint_type          = "PUBLIC"
     identity_provider_type = "SERVICE_MANAGED"

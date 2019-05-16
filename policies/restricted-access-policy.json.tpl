@@ -3,9 +3,14 @@
   "Statement": [
     {
       "Sid": "AllowListingOfUserFolder",
-      "Action": ["s3:ListBucket", "s3:GetBucketLocation"],
+      "Action": ["s3:ListBucket"],
       "Effect": "Allow",
-      "Resource": [${arn1}]
+      "Resource": ["arn:aws:s3:::$${transfer:HomeBucket}"],
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": ["$${transfer:UserName}/*", "$${transfer:UserName}"]
+        }
+      }
     },
     {
       "Sid": "HomeDirObjectAccess",
@@ -17,7 +22,7 @@
         "s3:DeleteObject",
         "s3:GetObjectVersion"
       ],
-      "Resource": [${arn2}]
+      "Resource": "arn:aws:s3:::$${transfer:HomeDirectory}*"
     }
   ]
 }

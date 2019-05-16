@@ -15,7 +15,9 @@
         "s3:GetObject",
         "s3:DeleteObjectVersion",
         "s3:DeleteObject",
-        "s3:GetObjectVersion"
+        "s3:GetObjectVersion",
+        "s3:GetObjectACL",
+        "s3:PutObjectACL"
       ],
       "Resource": "arn:aws:s3:::${bucket}/*"
     }
