@@ -1,4 +1,4 @@
-<img src="https://raw.github.com/Loganair/aws-sftp/master/images/loganair.png" alt="Logo" width="600>
+<img src="https://raw.github.com/Loganair/aws-sftp/master/images/loganair.png" alt="Logo" width="600">
 
 # AWS Secure File Transfer Protocol (SFTP)
 
