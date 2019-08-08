@@ -44,8 +44,8 @@ Enter the following details in the "Login (New Site)" dialog box then click "Sav
 File protocol: SFTP
 Host name: sftp.loganair.co.uk
 Port number: 22
-User name: <your user name>
-Password: leave blank
+User name: <the user name given to you>
+Password:
 ```
 
 In the "Save session as site" dialog box, Enter "Loganair SFTP" as the "Site name" and click "Ok".
